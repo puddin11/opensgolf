@@ -906,9 +906,10 @@ impl App {
         if kind == PopupKind::Info && self.has_goals() {
             lines.push(tr("STR_MENU_INFO_GOALS"));
         }
-        // the OpenSGolf extras' lines (extras.rs), last
+        // the OpenSGolf extras' lines (extras.rs), last: Buy land while the Keep the land offer extra keeps an approval
         if kind == PopupKind::Info {
             for (on, key) in [
+                (self.land_waiting(), "STR_MENU_INFO_BUY_LAND"),
                 (crate::extras::people(), "STR_MENU_INFO_PEOPLE"),
                 (crate::extras::history(), "STR_MENU_INFO_HISTORY"),
                 (crate::extras::path_help(), "STR_MENU_INFO_PATH_VIEW"),

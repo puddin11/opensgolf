@@ -34,6 +34,11 @@
 //!   unhappy golfers no longer start them where they stand (Club's mood change), so
 //!   a course needs no groundskeepers or landmarks to keep it clear (issue #105); the ones already there stay until
 //!   pulled.
+//! * `keep_land`: Keep the land offer: when the County commissioner approves an expansion, the approval waits until land
+//!   is bought (`Club::land_kept`). Saying No to his question, closing it, or leaving the land screen without buying keeps
+//!   it, and the Information menu's Buy land line opens the land screen whenever the player likes. In the original the
+//!   approval is gone once the question is answered, though he comes again on a later visitor turn while the club's
+//!   rating stays over his mark (vips.rs `vip_check`). At most one approval waits; buying a tract uses it.
 //!
 //! Freeze happiness and Unlock all are named "Sandbox: ..." in the Extras box as they are what a sandbox player wants
 //! most, but each works in a normal game too. The Extras box shows Slower seasons and Pause the calendar as one line,
@@ -66,13 +71,14 @@ pub struct Extras {
     pub path_style: u8,
     pub more_visitors: bool,
     pub no_weeds: bool,
+    pub keep_land: bool,
 }
 
 /// The options in the order the Extras box lists them (text keys of their lines). Option 6 has three values (a line with
 /// {VALUE}, `SPEED_KEYS`), the others are ticks; `Extras::option` and `Extras::set_option` read and set them by index.
 /// New options are appended so bits and saves keep working; the page each is shown on (Gameplay, Sandbox or Looks) is
 /// extras_ui.rs `PAGE_LINES`'s.
-pub const OPTION_KEYS: [&str; 15] = [
+pub const OPTION_KEYS: [&str; 16] = [
     "STR_EXTRAS_ROTATE",
     "STR_EXTRAS_CUT_CONTENT",
     "STR_EXTRAS_HARDCORE",
@@ -88,6 +94,7 @@ pub const OPTION_KEYS: [&str; 15] = [
     "STR_EXTRAS_PATHS",
     "STR_EXTRAS_MORE_VISITORS",
     "STR_EXTRAS_NO_WEEDS",
+    "STR_EXTRAS_KEEP_LAND",
 ];
 
 /// The option of `OPTION_KEYS` that is Weather that matters.
@@ -102,6 +109,8 @@ pub const PATHS: usize = 12;
 pub const MORE_VISITORS: usize = 13;
 /// The option of `OPTION_KEYS` that is Sandbox: no new dandelions.
 pub const NO_WEEDS: usize = 14;
+/// The option of `OPTION_KEYS` that is Keep the land offer.
+pub const KEEP_LAND: usize = 15;
 
 /// The option of `OPTION_KEYS` that is the calendar speed.
 pub const SEASON_SPEED: usize = 6;
@@ -136,6 +145,7 @@ impl Extras {
         path_style: 1,
         more_visitors: false,
         no_weeds: false,
+        keep_land: false,
     };
 
     /// The extras of the "OpenSGolf" preset: the looks, and the light gameplay extras that add to the game without changing
@@ -160,6 +170,8 @@ impl Extras {
         path_style: 1,
         more_visitors: false,
         no_weeds: false,
+        // it changes when land can be bought: not part of the preset
+        keep_land: false,
     };
 
     /// Everything off (the original game).
@@ -169,7 +181,8 @@ impl Extras {
 
     /// The options as bits (the `X:` test hook and `--extras`): one bit per tick in `OPTION_KEYS` order, except that the
     /// calendar speed takes two (bits 6 and 7), so the ticks after it sit one bit further on (8 to 12), Path styles and lamps
-    /// takes three (13 to 15), More visitors is bit 16 and Sandbox: no new dandelions bit 17. The first six keep the bits they always had.
+    /// takes three (13 to 15), More visitors is bit 16, Sandbox: no new dandelions bit 17 and Keep the land offer bit 18. The
+    /// first six keep the bits they always had.
     pub fn bits(&self) -> u32 {
         self.rotate as u32
             | (self.cut_content as u32) << 1
@@ -186,6 +199,7 @@ impl Extras {
             | (self.path_style.min(PATH_STYLES) as u32) << 13
             | (self.more_visitors as u32) << 16
             | (self.no_weeds as u32) << 17
+            | (self.keep_land as u32) << 18
     }
 
     pub fn from_bits(b: u32) -> Extras {
@@ -205,6 +219,7 @@ impl Extras {
             path_style: ((b >> 13) & 7).min(PATH_STYLES as u32) as u8,
             more_visitors: b & 1 << 16 != 0,
             no_weeds: b & 1 << 17 != 0,
+            keep_land: b & 1 << 18 != 0,
         }
     }
 
@@ -226,6 +241,7 @@ impl Extras {
             PATHS => self.path_style.min(PATH_STYLES),
             MORE_VISITORS => self.more_visitors as u8,
             NO_WEEDS => self.no_weeds as u8,
+            KEEP_LAND => self.keep_land as u8,
             _ => 0,
         }
     }
@@ -249,6 +265,7 @@ impl Extras {
             PATHS => self.path_style = v.min(PATH_STYLES),
             MORE_VISITORS => self.more_visitors = on,
             NO_WEEDS => self.no_weeds = on,
+            KEEP_LAND => self.keep_land = on,
             _ => {}
         }
     }
@@ -911,5 +928,23 @@ mod path_tests {
         assert!(club.remove_lamp(1, 2) && club.remove_lamp(4, 2) && !club.remove_lamp(4, 2));
         club.extras.path_style = 0;
         assert_eq!(serde_json::to_string(&club).unwrap(), plain);
+    }
+
+    #[test]
+    fn keep_the_land_offer_has_its_own_bit_and_saves_its_approval_only_while_it_waits() {
+        let e = Extras { keep_land: true, ..Default::default() };
+        assert_eq!(e.bits(), 1 << 18);
+        assert_eq!(Extras::from_bits(e.bits()), e);
+        assert_eq!(e.option(KEEP_LAND), 1);
+        const { assert!(!Extras::OPENSGOLF.keep_land && !Extras::LOOKS.keep_land, "in no preset") };
+        let mut club = crate::golfer::Club::default();
+        let plain = serde_json::to_string(&club).unwrap();
+        assert!(!plain.contains("land_kept"));
+        club.land_kept = true;
+        let back: crate::golfer::Club = serde_json::from_str(&serde_json::to_string(&club).unwrap()).unwrap();
+        assert!(back.land_kept);
+        // a save from before the extra has none waiting
+        let old: crate::golfer::Club = serde_json::from_str(&plain).unwrap();
+        assert!(!old.land_kept);
     }
 }

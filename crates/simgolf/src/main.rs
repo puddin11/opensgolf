@@ -943,6 +943,13 @@ fn apply_edit_spec(app: &mut App, spec: &str) {
                     app.club.next_hole
                 );
             }
+            b'c' => {
+                // the County commissioner has just approved an expansion, as vips.rs has it after his pleased round: his
+                // question comes on the next tick, and with the Keep the land offer extra the approval waits
+                app.club.land_offer = true;
+                app.club.land_kept |= app.club.extras.keep_land;
+                println!("commissioner approved an expansion: approval kept {}", app.club.land_kept);
+            }
             b'l' if item.len() > 2 && !v.is_empty() => {
                 // buy tract n (1..9) through the land screen
                 app.open_land_screen();
@@ -1742,6 +1749,11 @@ impl Stage {
             }
             return;
         }
+        // the commissioner's question answered No, Esc or a click outside: with the Keep the land offer extra the approval
+        // waits for the Information menu's Buy land line
+        if kind == popup_ui::PopupKind::LandOffer && r != Some(0) {
+            self.app.land_put_off();
+        }
         let Some(k) = r else {
             self.app.close_popup();
             return;
@@ -1759,6 +1771,7 @@ impl Stage {
         self.app.close_popup();
         use popup_ui::PopupKind;
         match kind {
+            PopupKind::Info if line == tr("STR_MENU_INFO_BUY_LAND") => self.app.open_land_screen(),
             PopupKind::Info if line == tr("STR_MENU_INFO_PEOPLE") => self.app.open_people(),
             PopupKind::Info if line == tr("STR_MENU_INFO_HISTORY") => self.app.open_history(),
             PopupKind::Info if line == tr("STR_MENU_INFO_PATH_VIEW") => self.app.toggle_path_view(),
@@ -4075,6 +4088,9 @@ impl Stage {
                 } else if app.screen == Screen::Land || (app.screen == Screen::Property && app.world_move) {
                     // TRACTS FOR SALE and the world map opened from a game (F6) go back to the course, as their cancel
                     // buttons do; Esc used to drop the game for the title menu
+                    if app.screen == Screen::Land {
+                        app.land_put_off();
+                    }
                     app.world_move = false;
                     app.screen = Screen::Play;
                 } else {

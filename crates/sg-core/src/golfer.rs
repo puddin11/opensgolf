@@ -487,6 +487,10 @@ pub struct Club {
     /// once a visitor has come.
     #[serde(default, skip_serializing_if = "crate::visitors::Visits::is_zero")]
     pub visits: crate::visitors::Visits,
+    /// The Keep the land offer extra (sg_core::extras): the County commissioner has approved an expansion and no land has
+    /// been bought since, so the Information menu's Buy land line opens the land screen; saved only while it waits.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub land_kept: bool,
 }
 
 impl Default for Club {
@@ -599,6 +603,7 @@ impl Club {
             announced: None,
             lamps: Vec::new(),
             visits: Default::default(),
+            land_kept: false,
         }
     }
 

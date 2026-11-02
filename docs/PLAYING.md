@@ -506,6 +506,13 @@ On the **Gameplay** page:
   hole on the Routing screen. Rebuilding the hole (painting over its tee or cup green and opening it again) gives it the
   game's par anew, a tournament's checklist sets its own pars, and switching the extra off puts every hole back to the
   game's par. Pars cannot be changed during a tournament.
+- **Keep the land offer: buy land when you like.** *(Light touch)* When the County commissioner enjoys his round and
+  approves an expansion, his approval waits until you buy land. Saying *No, I'm fine* to his question, closing it, or
+  leaving TRACTS FOR SALE without buying keeps it (the ticker says so), and the Information menu shows **Buy land
+  (approved)**, which opens TRACTS FOR SALE whenever you like. Buying a tract uses the approval; at most one waits, and it
+  is kept with the saved game. In the original the approval is gone once the question is answered, though the
+  commissioner comes back on a later visitor turn while your rating stays over his mark (he comes when the fun rating, or
+  the skill rating on Hard, is over (tracts bought + 2) x (difficulty + 2) x 50), and offers again if he enjoys that round.
 - **Left-handed golfers.** *(Light touch)* About one golfer in ten who arrives from now on is left-handed (decided by the game's own
   random draws when the golfer is made, and kept with the saved game). A left-hander is drawn as the mirror image of a
   right-hander while addressing the ball, swinging and following through, still facing the shot's target; walking,
@@ -638,7 +645,9 @@ On the **Looks** page:
 Test hooks: `--extras BITS` sets the extras a new game starts with (1 Tab turns, 2 cut content, 4 hardcore, 8 higher staff
 limits, 16 animals, 32 set par, 64 or 128 the calendar at half or quarter speed, 256 the calendar stopped, 512 freeze golfer
 happiness, 1024 unlock all, 2048 left-handed golfers, 4096 weather that matters, bits 13 to 15 path styles and lamps (below),
-65536 more visitors; not saved to the settings); `--edit "H:N,M,..."` makes golfer slots N, M... left-handed (-1 your
+65536 more visitors, 131072 no new dandelions, 262144 keep the land offer; not saved to the settings); `--edit "c"` has the
+County commissioner approve an expansion (his question comes on the next tick, and with Keep the land offer the approval
+waits), so `--extras 262144 --edit "c;M:0"` shows the Information menu's Buy land line; `--edit "H:N,M,..."` makes golfer slots N, M... left-handed (-1 your
 pro); `--edit "V:I,G"` makes golfer slot G (a negative G: the -G-th ordinary golfer out on the course) visitor I of
 data/visitors.toml (0..5 the touring pros, 6..13 the celebrities); `--edit "R:N"` asks for par N on the Hole Stats' hole (its
 confirmation box; `R:N,1` sets it at once); `--edit "X:BITS"` sets the extras of the game being played; `--edit "T:x,y"`

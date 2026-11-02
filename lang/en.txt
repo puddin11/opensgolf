@@ -1420,6 +1420,7 @@ STR_EXTRAS_DESC_LEFTIES                 :About one golfer in ten is left-handed:
 STR_EXTRAS_DESC_WEATHER                 :Rain and snow slow the ball and keep some golfers at home; desert heat waves speed it up. Gentle over a year.
 STR_EXTRAS_DESC_PATHS                   :Draws every path in brick, gravel, dark stone or boardwalk, and adds lamp posts to the landmark strip. A click picks the style.
 STR_EXTRAS_DESC_MORE_VISITORS           :Touring pros and celebrities drop in now and then. They pay more, draw crowds and say what they thought of your course.
+STR_EXTRAS_DESC_KEEP_LAND               :Saying No to the County commissioner's land offer keeps his approval: Information, Buy land opens the land for sale until you buy a tract.
 STR_EXTRAS_DESC_PEOPLE                  :A sortable list of every golfer and employee, with golfer profiles and your pro's screens (Shift+G).
 STR_EXTRAS_DESC_HISTORY                 :Keeps every ticker message with its date, so you can read back what you missed (Shift+M).
 STR_EXTRAS_DESC_NAME_TAGS               :A small tag with the name of the golfer or employee under the pointer (Shift+H hides and shows them).
@@ -1449,6 +1450,10 @@ STR_EXTRAS_PAUSE_CALENDAR               : Sandbox: pause the calendar
 STR_EXTRAS_FREEZE_MOODS                 : Sandbox: freeze golfer happiness
 STR_EXTRAS_UNLOCK_ALL                   : Sandbox: unlock all buildings and landmarks
 STR_EXTRAS_NO_WEEDS                     : Sandbox: no new dandelions
+# Keep the land offer (sg_core::extras): the County commissioner's approval waits until land is bought
+STR_EXTRAS_KEEP_LAND                    : Keep the land offer: buy land when you like
+STR_MENU_INFO_BUY_LAND                  : Buy land (approved)
+STR_TOAST_LAND_KEPT                     :The commissioner's approval is kept: buy land whenever you like from the Information menu.
 # Left-handed golfers (sg_core::extras): about one golfer in ten, and a tick for your pro on Customise Golfer
 STR_EXTRAS_LEFTIES                      : Left-handed golfers
 STR_SET_PAR_1                           :Change hole {HOLE} from par {OLD} to par {NEW}?

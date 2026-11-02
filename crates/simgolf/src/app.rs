@@ -3585,10 +3585,24 @@ impl App {
         }
     }
 
+    /// The commissioner's question answered No (or closed), or the land screen left without buying: with the Keep the land
+    /// offer extra the approval waits (`Club::land_kept`), and a toast says where to use it.
+    pub fn land_put_off(&mut self) {
+        if self.club.extras.keep_land && self.club.land_kept {
+            self.show_toast(tr("STR_TOAST_LAND_KEPT"));
+        }
+    }
+
+    /// The Information menu's Buy land line (the Keep the land offer extra): shown while an approval waits.
+    pub fn land_waiting(&self) -> bool {
+        self.club.extras.keep_land && self.club.land_kept
+    }
+
     /// A click on the land screen: buy the tract under the pointer, or leave on the cancel button or a right click.
     pub fn land_click(&mut self, right: bool) {
         if right || self.land_hover == 9 {
             self.screen = Screen::Play;
+            self.land_put_off();
             return;
         }
         if !(0..9).contains(&self.land_hover) {
@@ -3628,6 +3642,8 @@ impl App {
             }
         }
         self.club.purchases += 1;
+        // the approval the Keep the land offer extra kept is used
+        self.club.land_kept = false;
         println!("bought tract {} for {}", i + 1, crate::ui::money(cost as i64));
         self.screen = Screen::Play;
         self.dirty = true;
