@@ -132,6 +132,42 @@ fn edge_push(p: (f32, f32), area: (f32, f32, f32, f32), band: f32) -> (f32, f32)
     (side(p.0, l, r), side(p.1, t, b))
 }
 
+/// Whether the segment from `p` to `q` touches the rectangle `(left, top, width, height)` (Liang-Barsky).
+fn crosses((x, y, w, h): (f32, f32, f32, f32), p: (f32, f32), q: (f32, f32)) -> bool {
+    let (dx, dy) = (q.0 - p.0, q.1 - p.1);
+    let (mut t0, mut t1) = (0.0f32, 1.0f32);
+    for (num, den) in [(p.0 - x, -dx), (x + w - p.0, dx), (p.1 - y, -dy), (y + h - p.1, dy)] {
+        if den == 0.0 {
+            if num < 0.0 {
+                return false;
+            }
+        } else if den < 0.0 {
+            t0 = t0.max(num / den);
+        } else {
+            t1 = t1.min(num / den);
+        }
+    }
+    t0 <= t1
+}
+
+/// Where the shot's plate (`w` x `h`, its left and top) goes round the aimed spot `at`, `gap` clear of it (side to side, up
+/// and down): above, where a finger dragging the target (below it) does not cover it, unless the shot's lines (`lines`,
+/// 800 x 600 points from the ball) run through it there, as the arc of a high shot coming down on the spot does; then
+/// beside the spot on the side away from the ball (`ball_left`: the ball is left of the spot), the other side or below,
+/// whichever the lines cross least. Kept on the screen side to side.
+fn plate_spot(at: (f32, f32), (w, h): (f32, f32), gap: (f32, f32), lines: &[Vec<(f32, f32)>], ball_left: bool) -> (f32, f32) {
+    let (vx, vy) = at;
+    let (above, below) = ((vx - w * 0.5, vy - gap.1 - h), (vx - w * 0.5, vy + gap.1));
+    let (right, left) = ((vx + gap.0, vy - h * 0.5), (vx - gap.0 - w, vy - h * 0.5));
+    let order = if ball_left { [above, right, left, below] } else { [above, left, right, below] };
+    let hits = |&(x, y): &(f32, f32)| {
+        let r = (x - 2.0, y - 2.0, w + 4.0, h + 4.0);
+        lines.iter().flat_map(|l| l.windows(2)).filter(|s| crosses(r, s[0], s[1])).count()
+    };
+    // (the first of the least crossed, in that order)
+    order.into_iter().map(|(x, y)| (x.clamp(2.0, (798.0 - w).max(2.0)), y)).min_by_key(hits).unwrap_or(above)
+}
+
 /// What a touch target is for: the pro's aim, or the building tool's next placement (with its kind).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TargetFor {
@@ -482,9 +518,11 @@ impl Stage {
                                 self.touch.mode = Mode::Pan;
                                 self.finger_pan(x - start.0, y - start.1);
                             }
-                        } else if far && self.picks_spot(start) {
+                        } else if far && (self.picks_spot(start) || self.pans_here(start)) {
                             // an employee or a golfer waits for the tap that says where to go: a drag looks around for the
-                            // spot and posts nobody (a left press at the drag's start did, issue #86)
+                            // spot and posts nobody (a left press at the drag's start did, issue #86); and with no tool in
+                            // hand a drag only looks round: as a mouse drag it began with a left press, which picked up
+                            // the employee under the finger, or opened the golfer's card or the flag's Hole Stats
                             self.app.drag_state(true, now);
                             self.touch.mode = Mode::Pan;
                             self.finger_pan(x - start.0, y - start.1);
@@ -729,6 +767,25 @@ impl Stage {
         vy < 452.0 && !(a.ui_ok && crate::render::dock_hit(vx, vy) >= 0)
     }
 
+    /// Whether a one-finger drag from this drawable-pixel point only pans the view: on the course with no tool in hand (a
+    /// tool's drag paints) and nothing over it that a press there closes or works (the photo mode, the showcase, a great
+    /// shot's SimFoto, the shot analysis, the measuring tape, a name being typed). A tap still clicks there.
+    fn pans_here(&self, p: (f32, f32)) -> bool {
+        let a = &self.app;
+        let over = a.photo.is_some()
+            || a.showcase.is_some()
+            || a.great_shot.is_some()
+            || a.simfoto.is_some()
+            || a.analysis.is_some()
+            || a.bt.tape.is_some()
+            || a.typing();
+        if a.screen != Screen::Play || a.edit || a.popup.is_some() || a.notice.is_some() || over {
+            return false;
+        }
+        let (vx, vy) = a.view.to_virtual(p.0, p.1);
+        vy < 452.0 && !(a.ui_ok && crate::render::dock_hit(vx, vy) >= 0)
+    }
+
     /// The target is at ground point `w`, and the preview with it: the shot's (aim_pointer, as the pointer's hover does) or
     /// the building's footprint (the hover's ground point, main.rs update).
     fn set_target(&mut self, w: (f32, f32)) {
@@ -963,7 +1020,7 @@ impl Stage {
     }
 
     /// Test hooks for scripted stills (after SG_CLICK, before SG_PRESS): SG_TOUCH=1 counts the screen as touched (the touch
-    /// buttons show); SG_TAP="x,y;hold:x,y;down:x,y;key:Tab;..." taps, holds for a long press, or puts a finger down and
+    /// buttons show); SG_TAP="x,y;hold:x,y;down:x,y;key:Tab;staff;..." taps, holds for a long press, or puts a finger down and
     /// leaves it there (for stills of a pressed button) at window pixels, through the same path a finger takes, or presses a
     /// key (settings.json's names), with the frames a tap's click waits for drawn in between. Each step prints the button
     /// it pressed and the state the buttons change.
@@ -1019,6 +1076,21 @@ impl Stage {
                     (self.app.cam_x, self.app.cam_z) = self.app.units_to_world(gg.bx, gg.by);
                 }
                 self.draw_frame(None);
+                continue;
+            }
+            // staff centres the view on the employee hired last, and prints the window pixel it stands at
+            if t == "staff" {
+                let last =
+                    self.app.employees.iter().rev().find(|e| e.active && e.job != sg_core::staff::job::OWNER).map(|e| (e.job, e.x, e.y));
+                if let Some((_, x, y)) = last {
+                    (self.app.cam_x, self.app.cam_z) = self.app.units_to_world(x, y);
+                }
+                self.draw_frame(None);
+                if let Some((job, x, y)) = last {
+                    let (wx, wz) = self.app.units_to_world(x, y);
+                    let (px, py) = self.app.pixel_of_world(wx, wz);
+                    println!("staff job {job} at window pixel {px:.0},{py:.0}");
+                }
                 continue;
             }
             // pan2:x0,y0,x1,y1 moves two fingers (80 pixels apart, side by side) from x0,y0 to x1,y1 and lifts them
@@ -1147,13 +1219,15 @@ impl Stage {
             .or((a.club.gary >= 0).then_some(a.club.gary as usize))
             .map(|g| (a.club.g[g].hole, a.club.g[g].strokes, a.club.g[g].bx, a.club.g[g].by));
         println!(
-            "touch target after {step}: for {:?}, tile {tile:?}, dragging {}, aim {aim:?}, pro (hole, strokes, ball) {strokes:?}, objects {}, cash {:.0}, view at {:.0},{:.0}",
+            "touch target after {step}: for {:?}, tile {tile:?}, dragging {}, aim {aim:?}, pro (hole, strokes, ball) {strokes:?}, objects {}, cash {:.0}, view at {:.0},{:.0}, moving employee {:?}, card {:?}",
             a.touch_target_for(),
             a.touch_target.dragging(),
             a.land.as_ref().map_or(0, |l| l.objects.len()),
             a.econ.cash,
             a.cam_x,
-            a.cam_z
+            a.cam_z,
+            a.moving_employee,
+            a.card
         );
     }
 
@@ -1240,8 +1314,8 @@ impl Stage {
     }
 
     /// The touch target (TouchTarget): for the shot a ring on the aimed spot with its distance and club above it (where a
-    /// finger below does not cover them; a building shows its footprint and price as with the pointer), and while a finger
-    /// drags the target a thin line from the finger to it.
+    /// finger below does not cover them), or beside it when the shot's line comes down there (plate_spot); a building shows
+    /// its footprint and price as with the pointer; and while a finger drags the target a thin line from the finger to it.
     fn draw_touch_target(&mut self) {
         let a = &self.app;
         let what = a.touch_target_for();
@@ -1260,6 +1334,29 @@ impl Stage {
             _ => (wx, wz, String::new()),
         };
         let Some((vx, vy)) = a.screen_of_world(wx, wz) else { return };
+        // the shot's lines as render.rs draws them: on the ground, and the arc lifted up the screen
+        let lines: Vec<Vec<(f32, f32)>> = a
+            .aim_path()
+            .filter(|_| !label.is_empty())
+            .map(|(line, lifts)| {
+                let ground: Vec<((f32, f32), f32)> = line
+                    .iter()
+                    .zip(&lifts)
+                    .filter_map(|(&(x, y), &l)| {
+                        let (wx, wz) = a.units_to_world(x, y);
+                        a.screen_of_world(wx, wz).map(|p| (p, l))
+                    })
+                    .collect();
+                vec![ground.iter().map(|&(p, _)| p).collect(), ground.iter().map(|&((x, y), l)| (x, y - l)).collect()]
+            })
+            .unwrap_or_default();
+        let ball_left = lines.first().and_then(|l| l.first()).is_some_and(|b| b.0 < vx);
+        // how far the box on the aimed tile (render.rs draw_aim) reaches from the spot, side to side
+        let r = sg_core::terrain::TILE_SIZE * 0.5;
+        let box_half = [(-r, -r), (r, -r), (r, r), (-r, r)]
+            .iter()
+            .filter_map(|&(dx, dz)| a.screen_of_world(wx + dx, wz + dz))
+            .fold(0.0f32, |m, (x, _)| m.max((x - vx).abs()));
         let s = Ui::new(a.draw_w, a.draw_h);
         let k = self.button_radius() / R_MIN;
         let finger = if a.touch_target.dragging() { self.touch.fingers.first().map(|f| a.view.to_virtual(f.2 .0, f.2 .1)) } else { None };
@@ -1274,7 +1371,8 @@ impl Stage {
             s.fill(g, vx - 0.75, vy - 0.75, 1.5, 1.5, GOLD);
             let size = 13.0 * k * crate::textsize::scale();
             let tw = crate::ui::text_width(&label, size);
-            let (x, y) = ((vx - tw * 0.5 - 6.0 * k).clamp(2.0, 798.0 - tw - 12.0 * k), vy - 14.0 * k - 20.0 * k);
+            let gap = ((14.0 * k).max(box_half + 4.0), 14.0 * k);
+            let (x, y) = plate_spot((vx, vy), (tw + 12.0 * k, 20.0 * k), gap, &lines, ball_left);
             s.fill(g, x, y, tw + 12.0 * k, 20.0 * k, rgba(0.0, 0.0, 0.0, 0.7));
             s.text(g, x + 6.0 * k, y + 15.0 * k, &label, size, rgb(1.0, 1.0, 1.0));
         }
@@ -1697,6 +1795,28 @@ mod tests {
         assert!(!grabs_target((400.0, 290.0), t, 80.0) && !grabs_target((100.0, 100.0), t, 80.0));
         // no target yet, or one off the screen: the drag pans (a tap sets the target)
         assert!(!grabs_target((400.0, 200.0), None, 80.0));
+    }
+
+    #[test]
+    fn the_shot_plate_stays_above_the_spot_unless_the_shot_comes_down_there() {
+        let (spot, size, gap) = ((400.0, 200.0), (120.0, 20.0), (30.0, 14.0));
+        // nothing in the way: above the spot, centred, as before
+        assert_eq!(plate_spot(spot, size, gap, &[], true), (340.0, 166.0));
+        // a ball below the spot: its line stays clear of the plate above
+        let from_below = vec![vec![(300.0, 330.0), (400.0, 200.0)]];
+        assert_eq!(plate_spot(spot, size, gap, &from_below, true), (340.0, 166.0));
+        // a high shot from the left coming down on the spot: beside it, away from the ball
+        let lob = vec![vec![(250.0, 260.0), (330.0, 120.0), (390.0, 150.0), (400.0, 200.0)]];
+        assert_eq!(plate_spot(spot, size, gap, &lob, true), (430.0, 190.0));
+        // the same shot from the right: on the left
+        let mirrored: Vec<Vec<(f32, f32)>> = lob.iter().map(|l| l.iter().map(|&(x, y)| (800.0 - x, y)).collect()).collect();
+        assert_eq!(plate_spot(spot, size, gap, &mirrored, false), (250.0, 190.0));
+        // kept on the screen at its edge
+        assert_eq!(plate_spot((790.0, 200.0), size, gap, &[], true), (678.0, 166.0));
+        // a segment through, into, or past the rectangle
+        let r = (0.0, 0.0, 10.0, 10.0);
+        assert!(crosses(r, (-5.0, 5.0), (15.0, 5.0)) && crosses(r, (5.0, 5.0), (5.0, 6.0)) && crosses(r, (-5.0, -5.0), (5.0, 5.0)));
+        assert!(!crosses(r, (-5.0, -5.0), (-1.0, 20.0)) && !crosses(r, (11.0, 0.0), (11.0, 10.0)) && !crosses(r, (-5.0, 6.0), (6.0, 17.0)));
     }
 
     #[test]

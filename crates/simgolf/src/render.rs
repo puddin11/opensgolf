@@ -29,6 +29,9 @@ impl Rect {
     }
 }
 
+/// The pro's aim line's points (map units) and how far up the screen each is drawn (`App::aim_path`).
+pub(crate) type AimPath = (Vec<(i32, i32)>, Vec<f32>);
+
 // ---- the course ---------------------------------------------------------------------------------------------------------------
 
 impl App {
@@ -101,17 +104,22 @@ impl App {
         g.flush();
     }
 
+    /// The pro's aim line (0x41bbe1) in map units from the ball, and how far up the screen each point is drawn (800 x 600
+    /// pixels); None when the pro is not aiming.
+    pub(crate) fn aim_path(&self) -> Option<AimPath> {
+        let (Some(gi), Some(p)) = (self.club.pro_aiming(), self.aim) else { return None };
+        let gg = &self.club.g[gi];
+        let opt = self.club.planner.option;
+        // a left-handed pro's draw and fade bend the other way (the Left-handed golfers extra)
+        let line = sg_core::pro::aim_line((gg.bx, gg.by), &p, self.club.hand_bend(gi, opt));
+        Some((line, sg_core::pro::aim_lifts(p.distance, opt, self.exe_zoom())))
+    }
+
     /// The pro's aim line (0x41bbe1): from the ball, bending with the shot type, drawn white over a dark copy; and a box on
     /// the aimed tile.
     fn draw_aim(&mut self, g: &mut Gfx, u: &Uniforms) {
-        let (Some(gi), Some(p)) = (self.club.pro_aiming(), self.aim) else { return };
-        let gg = &self.club.g[gi];
-        let ball = (gg.bx, gg.by);
-        let opt = self.club.planner.option;
-        // a left-handed pro's draw and fade bend the other way (the Left-handed golfers extra)
-        let line = sg_core::pro::aim_line(ball, &p, self.club.hand_bend(gi, opt));
+        let (Some(p), Some((line, lifts))) = (self.aim, self.aim_path()) else { return };
         let zoom = self.exe_zoom();
-        let lifts = sg_core::pro::aim_lifts(p.distance, opt, zoom);
         let mv = self.mv;
         let (ux, uy, uz) = (mv[1], mv[5], mv[9]);
         let vscale = crate::ui::view_scale(self.draw_w, self.draw_h);

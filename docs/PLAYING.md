@@ -1278,7 +1278,7 @@ an iPad); a desktop window, however tall, never is. The Android app is held in l
 
 Tap for a click; drag one finger to scroll the course (or to paint with the selected tool); hold a finger still for half a
 second for a right click (undo, remove, close a screen). While an employee (Move) or a golfer (the card's Move or Eject)
-waits for its new spot, dragging only scrolls the course and the next tap is the spot (issue #86). With the raise / lower tool (the Elevation panel, or =), a tap raises
+waits for its new spot, dragging only scrolls the course and the next tap is the spot (issue #86). With no tool in hand a drag over the course only scrolls it too: it no longer picks up the employee, or opens the golfer's card or the flag's Hole Stats, under the finger where it starts (a tap still does). With the raise / lower tool (the Elevation panel, or =), a tap raises
 the ground and holding a finger still for half a second lowers it instead (the keyboard's Shift+click); keep the finger down
 and drag to go on lowering along the way. With two fingers: drag to scroll, pinch to step through the three
 zoom levels, twist to turn the view a quarter. Once the screen has been touched, small round buttons down the right edge
@@ -1300,7 +1300,7 @@ keys (issue #50).
 pointer and a click shoots (or places); a finger cannot hover, so with a finger the two are apart. While your pro waits
 for your shot, or with a building, home site, landmark or single garden item (bench, flower bed, willow, bridge, ball
 washer) in hand: a tap on the course sets the target there and shows the same preview the pointer shows (the aim line and
-tile with the panel's club and distance, plus a plate with the distance and club above the spot; or the footprint, name and
+tile with the panel's club and distance, plus a plate with the distance and club above the spot, or beside it, away from the ball, when the shot's line comes down there; or the footprint, name and
 price); drag it with one finger to move it (a drag that starts on the target lifts it a fingertip and a half above the
 finger, one that starts just beside it moves it along as on a trackpad, and a thin line joins finger and target); lifting
 the finger does nothing. A one-finger drag that starts anywhere else on the course (or before a target is set) moves the
@@ -1324,11 +1324,14 @@ before `SG_PRESS`; each step prints the button it pressed and the speed, turn, o
 steps for the touch target: `drag:x0,y0,x1,y1` drags one finger and lifts it, `slide:x0,y0,x1,y1` leaves it down at the
 end (a still while dragging), `click:x,y` is a mouse click (to compare), `frames:N` draws N frames with the previews
 updated (the aim's lock runs out after 10, and each moves the clock on a thirtieth of a second, so a target held at the
-edge scrolls), `run:S` plays S seconds (the shot after Swing) and `pro` centres the view on your pro's ball; `pan2:x0,y0,x1,y1`
+edge scrolls), `run:S` plays S seconds (the shot after Swing), `pro` centres the view on your pro's ball and `staff` on
+the employee hired last (printing the window pixel he stands at); `pan2:x0,y0,x1,y1`
 moves two fingers side by side and prints how far the view went, `lift` lifts the finger a `slide` left down, and
 `btn:centre` / `btn:swing` tap that touch button where it is drawn; they print the target, the aim, the pro's hole, strokes
-and ball, the cash and the view's position. `--edit "j:0,3"` starts a practice round left for you to aim, `j:1,3,1` a match
-(the challenge brought first by famous pro 0).
+and ball, the cash, the view's position, the employee being moved and the golfer whose card is open. `--edit "j:0,3"`
+starts a practice round left for you to aim, `j:1,3,1` a match (the challenge brought first by famous pro 0). For
+example, with `--size 800x600 --property 0 --clock 4242 --edit "h:2,24,27" --time 20` (a groundskeeper),
+`SG_TAP="staff;drag:400,295,520,360"` scrolls the view and leaves him where he is, where `staff;400,295` picks him up.
 
 ### Android
 
